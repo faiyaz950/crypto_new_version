@@ -23,34 +23,117 @@ import ssl
 from functools import wraps
 from email.message import EmailMessage
 from werkzeug.security import generate_password_hash, check_password_hash
-from django_orm import (
-    init_database,
-    save_login_entry,
-    fetch_login_history,
-    save_broker_login_entry,
-    get_latest_broker_login,
-    save_demo_order_entry,
-    fetch_recent_orders,
-    create_user_account,
-    get_user_account_by_username,
-    get_user_account_by_id,
-    update_user_account_fields,
-    create_user_session,
-    get_active_session_by_token,
-    deactivate_session,
-    create_exchange_account,
-    list_exchange_accounts_for_user,
-    get_exchange_account_for_user,
-    get_exchange_account_by_fingerprint,
-    update_exchange_account_status,
-    update_exchange_account_credentials,
-    delete_exchange_account_for_user,
-    get_latest_exchange_account_for_user,
-    save_byok_order_entry,
-    fetch_byok_orders,
-    create_email_change_otp,
-    verify_email_change_otp,
-)
+try:
+    from django_orm import (
+        init_database,
+        save_login_entry,
+        fetch_login_history,
+        save_broker_login_entry,
+        get_latest_broker_login,
+        save_demo_order_entry,
+        fetch_recent_orders,
+        create_user_account,
+        get_user_account_by_username,
+        get_user_account_by_id,
+        update_user_account_fields,
+        create_user_session,
+        get_active_session_by_token,
+        deactivate_session,
+        create_exchange_account,
+        list_exchange_accounts_for_user,
+        get_exchange_account_for_user,
+        get_exchange_account_by_fingerprint,
+        update_exchange_account_status,
+        update_exchange_account_credentials,
+        delete_exchange_account_for_user,
+        get_latest_exchange_account_for_user,
+        save_byok_order_entry,
+        fetch_byok_orders,
+        create_email_change_otp,
+        verify_email_change_otp,
+    )
+    DJANGO_ORM_AVAILABLE = True
+except Exception as _orm_exc:
+    # Allow deployments (e.g. Vercel) to run without DB layer.
+    DJANGO_ORM_AVAILABLE = False
+
+    def init_database():
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def save_login_entry(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def fetch_login_history(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def save_broker_login_entry(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def get_latest_broker_login(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def save_demo_order_entry(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def fetch_recent_orders(*args, **kwargs):
+        return []
+
+    def create_user_account(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def get_user_account_by_username(*args, **kwargs):
+        return None
+
+    def get_user_account_by_id(*args, **kwargs):
+        return None
+
+    def update_user_account_fields(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def create_user_session(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def get_active_session_by_token(*args, **kwargs):
+        return None
+
+    def deactivate_session(*args, **kwargs):
+        return False
+
+    def create_exchange_account(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def list_exchange_accounts_for_user(*args, **kwargs):
+        return []
+
+    def get_exchange_account_for_user(*args, **kwargs):
+        return None
+
+    def get_exchange_account_by_fingerprint(*args, **kwargs):
+        return None
+
+    def update_exchange_account_status(*args, **kwargs):
+        return False
+
+    def update_exchange_account_credentials(*args, **kwargs):
+        return False
+
+    def delete_exchange_account_for_user(*args, **kwargs):
+        return False
+
+    def get_latest_exchange_account_for_user(*args, **kwargs):
+        return None
+
+    def save_byok_order_entry(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def fetch_byok_orders(*args, **kwargs):
+        return []
+
+    def create_email_change_otp(*args, **kwargs):
+        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
+
+    def verify_email_change_otp(*args, **kwargs):
+        return False
 try:
     _fernet_module = importlib.import_module("cryptography.fernet")
     Fernet = getattr(_fernet_module, "Fernet", None)
@@ -74,6 +157,8 @@ try:
 except Exception as e:
     DB_READY = False
     print(f"⚠️ Database initialization failed: {e}")
+if not DJANGO_ORM_AVAILABLE:
+    DB_READY = False
 
 
 SUPPORTED_EXCHANGES = {"delta", "binance", "bybit"}
