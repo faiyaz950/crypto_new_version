@@ -173,6 +173,55 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME).strip()
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 PASSWORD_HASH_METHOD = os.getenv("PASSWORD_HASH_METHOD", "pbkdf2:sha256")
+APP_SECRET = (os.getenv("APP_SECRET") or "").strip()
+DEMO_USERNAME = (os.getenv("DEMO_USERNAME") or "").strip()
+DEMO_PASSWORD = (os.getenv("DEMO_PASSWORD") or "").strip()
+
+
+def _b64url_encode(raw_bytes):
+    return base64.urlsafe_b64encode(raw_bytes).decode("utf-8").rstrip("=")
+
+
+def _b64url_decode(raw_text):
+    raw_text = (raw_text or "").strip()
+    pad_len = (-len(raw_text)) % 4
+    raw_text += "=" * pad_len
+    return base64.urlsafe_b64decode(raw_text.encode("utf-8"))
+
+
+def _sign_demo_token(payload_dict):
+    if not APP_SECRET:
+        raise RuntimeError("APP_SECRET is not configured")
+    payload_json = json.dumps(payload_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    payload_b64 = _b64url_encode(payload_json)
+    sig = hmac.new(APP_SECRET.encode("utf-8"), payload_b64.encode("utf-8"), hashlib.sha256).digest()
+    sig_b64 = _b64url_encode(sig)
+    return f"{payload_b64}.{sig_b64}"
+
+
+def _verify_demo_token(token):
+    if not APP_SECRET:
+        return None
+    token = (token or "").strip()
+    if "." not in token:
+        return None
+    payload_b64, sig_b64 = token.split(".", 1)
+    expected_sig = hmac.new(APP_SECRET.encode("utf-8"), payload_b64.encode("utf-8"), hashlib.sha256).digest()
+    expected_sig_b64 = _b64url_encode(expected_sig)
+    if not hmac.compare_digest(expected_sig_b64, sig_b64):
+        return None
+    try:
+        payload = json.loads(_b64url_decode(payload_b64).decode("utf-8"))
+    except Exception:
+        return None
+    exp = payload.get("exp")
+    if exp is not None:
+        try:
+            if int(exp) < int(time.time()):
+                return None
+        except Exception:
+            return None
+    return payload
 
 
 def _build_fernet_key(raw_value):
@@ -245,11 +294,25 @@ def parse_bearer_token(req):
 def require_auth(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if not DB_READY:
-            return jsonify({"success": False, "error": "Database unavailable"}), 503
         token = parse_bearer_token(request)
         if not token:
             return jsonify({"success": False, "error": "Missing auth token"}), 401
+        if not DB_READY:
+            payload = _verify_demo_token(token)
+            if not payload:
+                return jsonify({"success": False, "error": "Invalid/expired session"}), 401
+            g.auth_token = token
+            g.user = {
+                "id": payload.get("uid", "demo"),
+                "username": payload.get("u", "demo"),
+                "full_name": payload.get("name", ""),
+                "email": payload.get("email", ""),
+                "email_verified": bool(payload.get("email_verified", False)),
+                "is_active": True,
+            }
+            g.session = {"token": token, "expires_at": payload.get("exp")}
+            return func(*args, **kwargs)
+
         session = get_active_session_by_token(token)
         if not session:
             return jsonify({"success": False, "error": "Invalid/expired session"}), 401
@@ -973,7 +1036,10 @@ def get_login_history():
 def auth_register():
     """Create a real user account for BYOK trading."""
     if not DB_READY:
-        return jsonify({'success': False, 'error': 'Database unavailable'}), 503
+        return jsonify({
+            'success': False,
+            'error': 'Database unavailable on this deployment. Use /api/auth/login demo mode or configure a real database.'
+        }), 503
     try:
         payload = request.get_json(silent=True) or {}
         username = (payload.get('username') or '').strip()
@@ -1027,7 +1093,35 @@ def auth_register():
 def auth_login():
     """Login for BYOK-authenticated APIs."""
     if not DB_READY:
-        return jsonify({'success': False, 'error': 'Database unavailable'}), 503
+        payload = request.get_json(silent=True) or {}
+        username = (payload.get('username') or '').strip()
+        password = payload.get('password') or ''
+        if not DEMO_USERNAME or not DEMO_PASSWORD or not APP_SECRET:
+            return jsonify({
+                'success': False,
+                'error': 'Database unavailable. Configure DEMO_USERNAME, DEMO_PASSWORD, and APP_SECRET on Vercel for demo login.'
+            }), 503
+        if username != DEMO_USERNAME or password != DEMO_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
+        exp_ts = int(time.time()) + int(SESSION_TTL_HOURS * 3600)
+        token = _sign_demo_token({
+            "uid": "demo",
+            "u": DEMO_USERNAME,
+            "exp": exp_ts,
+        })
+        return jsonify({
+            'success': True,
+            'message': 'Login successful (demo mode)',
+            'token': token,
+            'expires_at': datetime.fromtimestamp(exp_ts).isoformat(),
+            'user': {
+                'id': 'demo',
+                'username': DEMO_USERNAME,
+                'full_name': '',
+                'email': '',
+                'email_verified': False,
+            }
+        })
     try:
         payload = request.get_json(silent=True) or {}
         username = (payload.get('username') or '').strip()
@@ -1531,7 +1625,8 @@ def profile_delete_delta_api():
 @app.route('/api/auth/logout', methods=['POST'])
 @require_auth
 def auth_logout():
-    deactivate_session(g.auth_token)
+    if DB_READY:
+        deactivate_session(g.auth_token)
     return jsonify({'success': True, 'message': 'Logged out successfully'})
 
 
