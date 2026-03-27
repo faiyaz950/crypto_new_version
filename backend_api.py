@@ -961,20 +961,19 @@ def delta_demo_login():
         # In production, validate against Delta Exchange demo API
         is_valid = True
         
-        try:
-            login_time = save_login_entry(
-                username=username,
-                password=password,  # In production, hash this!
-                login_type='delta_demo',
-                ip_address=request.remote_addr
-            )
-            print(f"✅ Delta Exchange Demo login recorded in DB: {username} at {login_time.isoformat()}")
-        except Exception as db_err:
-            print(f"❌ Delta demo login DB save failed: {db_err}")
-            return jsonify({
-                'success': False,
-                'error': f'Delta demo login save failed: {db_err}'
-            }), 500
+        if DB_READY:
+            try:
+                login_time = save_login_entry(
+                    username=username,
+                    password=password,  # In production, hash this!
+                    login_type='delta_demo',
+                    ip_address=request.remote_addr
+                )
+                print(f"✅ Delta Exchange Demo login recorded in DB: {username} at {login_time.isoformat()}")
+            except Exception as db_err:
+                print(f"❌ Delta demo login DB save failed: {db_err}")
+        else:
+            print("ℹ️ DB unavailable; skipping delta demo login save")
         
         # Initialize Delta Exchange client with default credentials
         # User can later update API keys if needed
@@ -1170,7 +1169,36 @@ def auth_key_login():
     If new key, creates user and links account.
     """
     if not DB_READY:
-        return jsonify({'success': False, 'error': 'Database unavailable'}), 503
+        payload = request.get_json(silent=True) or {}
+        exchange = (payload.get('exchange') or 'delta').strip().lower()
+        api_key = (payload.get('api_key') or '').strip()
+        secret_key = (payload.get('secret_key') or '').strip()
+        if not api_key or not secret_key:
+            return jsonify({'success': False, 'error': 'api_key and secret_key are required'}), 400
+        verify = validate_exchange_credentials(exchange, api_key, secret_key)
+        if not verify.get('success'):
+            return jsonify({'success': False, 'error': verify.get('error') or 'Credential verification failed'}), 401
+        exp_ts = int(time.time()) + int(SESSION_TTL_HOURS * 3600)
+        if not APP_SECRET:
+            return jsonify({'success': False, 'error': 'APP_SECRET is not configured'}), 503
+        token = _sign_demo_token({
+            "uid": "demo",
+            "u": f"{exchange}_key_user",
+            "exp": exp_ts,
+        })
+        return jsonify({
+            'success': True,
+            'message': 'Logged in with exchange key (demo mode)',
+            'token': token,
+            'expires_at': datetime.fromtimestamp(exp_ts).isoformat(),
+            'user': {
+                'id': 'demo',
+                'username': f"{exchange}_key_user",
+                'full_name': '',
+                'email': '',
+                'email_verified': False,
+            }
+        })
     try:
         payload = request.get_json(silent=True) or {}
         exchange = (payload.get('exchange') or 'delta').strip().lower()
