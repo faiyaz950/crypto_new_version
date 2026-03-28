@@ -24,9 +24,8 @@ from fetch_trading_data import CryptoAPIClient
 import json
 
 # Configuration (Delta Exchange only)
-import os
-API_KEY = (os.getenv("DELTA_API_KEY") or os.getenv("API_KEY") or "").strip()
-SECRET_KEY = (os.getenv("DELTA_SECRET_KEY") or os.getenv("SECRET_KEY") or "").strip()
+API_KEY = "XBLVtcV7p6j3Qd6oSmDaQeeJsWFuHe"
+SECRET_KEY = "BjmaIGgWVBPjwc8o27Gsgxg7c3VWHZnqxtc5ZMCR0QRDMEd9eUS7GcEqgivg"
 
 # Default configuration (easily configurable)
 DEFAULT_CONFIG = {

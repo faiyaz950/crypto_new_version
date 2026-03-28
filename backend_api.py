@@ -23,117 +23,34 @@ import ssl
 from functools import wraps
 from email.message import EmailMessage
 from werkzeug.security import generate_password_hash, check_password_hash
-try:
-    from django_orm import (
-        init_database,
-        save_login_entry,
-        fetch_login_history,
-        save_broker_login_entry,
-        get_latest_broker_login,
-        save_demo_order_entry,
-        fetch_recent_orders,
-        create_user_account,
-        get_user_account_by_username,
-        get_user_account_by_id,
-        update_user_account_fields,
-        create_user_session,
-        get_active_session_by_token,
-        deactivate_session,
-        create_exchange_account,
-        list_exchange_accounts_for_user,
-        get_exchange_account_for_user,
-        get_exchange_account_by_fingerprint,
-        update_exchange_account_status,
-        update_exchange_account_credentials,
-        delete_exchange_account_for_user,
-        get_latest_exchange_account_for_user,
-        save_byok_order_entry,
-        fetch_byok_orders,
-        create_email_change_otp,
-        verify_email_change_otp,
-    )
-    DJANGO_ORM_AVAILABLE = True
-except Exception as _orm_exc:
-    # Allow deployments (e.g. Vercel) to run without DB layer.
-    DJANGO_ORM_AVAILABLE = False
-
-    def init_database():
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def save_login_entry(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def fetch_login_history(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def save_broker_login_entry(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def get_latest_broker_login(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def save_demo_order_entry(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def fetch_recent_orders(*args, **kwargs):
-        return []
-
-    def create_user_account(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def get_user_account_by_username(*args, **kwargs):
-        return None
-
-    def get_user_account_by_id(*args, **kwargs):
-        return None
-
-    def update_user_account_fields(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def create_user_session(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def get_active_session_by_token(*args, **kwargs):
-        return None
-
-    def deactivate_session(*args, **kwargs):
-        return False
-
-    def create_exchange_account(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def list_exchange_accounts_for_user(*args, **kwargs):
-        return []
-
-    def get_exchange_account_for_user(*args, **kwargs):
-        return None
-
-    def get_exchange_account_by_fingerprint(*args, **kwargs):
-        return None
-
-    def update_exchange_account_status(*args, **kwargs):
-        return False
-
-    def update_exchange_account_credentials(*args, **kwargs):
-        return False
-
-    def delete_exchange_account_for_user(*args, **kwargs):
-        return False
-
-    def get_latest_exchange_account_for_user(*args, **kwargs):
-        return None
-
-    def save_byok_order_entry(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def fetch_byok_orders(*args, **kwargs):
-        return []
-
-    def create_email_change_otp(*args, **kwargs):
-        raise RuntimeError(f"Database layer unavailable: {_orm_exc}")
-
-    def verify_email_change_otp(*args, **kwargs):
-        return False
+from django_orm import (
+    init_database,
+    save_login_entry,
+    fetch_login_history,
+    save_broker_login_entry,
+    get_latest_broker_login,
+    save_demo_order_entry,
+    fetch_recent_orders,
+    create_user_account,
+    get_user_account_by_username,
+    get_user_account_by_id,
+    update_user_account_fields,
+    create_user_session,
+    get_active_session_by_token,
+    deactivate_session,
+    create_exchange_account,
+    list_exchange_accounts_for_user,
+    get_exchange_account_for_user,
+    get_exchange_account_by_fingerprint,
+    update_exchange_account_status,
+    update_exchange_account_credentials,
+    delete_exchange_account_for_user,
+    get_latest_exchange_account_for_user,
+    save_byok_order_entry,
+    fetch_byok_orders,
+    create_email_change_otp,
+    verify_email_change_otp,
+)
 try:
     _fernet_module = importlib.import_module("cryptography.fernet")
     Fernet = getattr(_fernet_module, "Fernet", None)
@@ -144,8 +61,8 @@ app = Flask(__name__)
 CORS(app)
 
 # API credentials (Delta Exchange only)
-API_KEY = (os.getenv("DELTA_API_KEY") or os.getenv("API_KEY") or "").strip()
-SECRET_KEY = (os.getenv("DELTA_SECRET_KEY") or os.getenv("SECRET_KEY") or "").strip()
+API_KEY = "XBLVtcV7p6j3Qd6oSmDaQeeJsWFuHe"
+SECRET_KEY = "BjmaIGgWVBPjwc8o27Gsgxg7c3VWHZnqxtc5ZMCR0QRDMEd9eUS7GcEqgivg"
 
 # Global client
 client = CryptoAPIClient(API_KEY, SECRET_KEY)
@@ -157,8 +74,6 @@ try:
 except Exception as e:
     DB_READY = False
     print(f"⚠️ Database initialization failed: {e}")
-if not DJANGO_ORM_AVAILABLE:
-    DB_READY = False
 
 
 SUPPORTED_EXCHANGES = {"delta", "binance", "bybit"}
@@ -173,55 +88,6 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME).strip()
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 PASSWORD_HASH_METHOD = os.getenv("PASSWORD_HASH_METHOD", "pbkdf2:sha256")
-APP_SECRET = (os.getenv("APP_SECRET") or "").strip()
-DEMO_USERNAME = (os.getenv("DEMO_USERNAME") or "").strip()
-DEMO_PASSWORD = (os.getenv("DEMO_PASSWORD") or "").strip()
-
-
-def _b64url_encode(raw_bytes):
-    return base64.urlsafe_b64encode(raw_bytes).decode("utf-8").rstrip("=")
-
-
-def _b64url_decode(raw_text):
-    raw_text = (raw_text or "").strip()
-    pad_len = (-len(raw_text)) % 4
-    raw_text += "=" * pad_len
-    return base64.urlsafe_b64decode(raw_text.encode("utf-8"))
-
-
-def _sign_demo_token(payload_dict):
-    if not APP_SECRET:
-        raise RuntimeError("APP_SECRET is not configured")
-    payload_json = json.dumps(payload_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    payload_b64 = _b64url_encode(payload_json)
-    sig = hmac.new(APP_SECRET.encode("utf-8"), payload_b64.encode("utf-8"), hashlib.sha256).digest()
-    sig_b64 = _b64url_encode(sig)
-    return f"{payload_b64}.{sig_b64}"
-
-
-def _verify_demo_token(token):
-    if not APP_SECRET:
-        return None
-    token = (token or "").strip()
-    if "." not in token:
-        return None
-    payload_b64, sig_b64 = token.split(".", 1)
-    expected_sig = hmac.new(APP_SECRET.encode("utf-8"), payload_b64.encode("utf-8"), hashlib.sha256).digest()
-    expected_sig_b64 = _b64url_encode(expected_sig)
-    if not hmac.compare_digest(expected_sig_b64, sig_b64):
-        return None
-    try:
-        payload = json.loads(_b64url_decode(payload_b64).decode("utf-8"))
-    except Exception:
-        return None
-    exp = payload.get("exp")
-    if exp is not None:
-        try:
-            if int(exp) < int(time.time()):
-                return None
-        except Exception:
-            return None
-    return payload
 
 
 def _build_fernet_key(raw_value):
@@ -294,25 +160,11 @@ def parse_bearer_token(req):
 def require_auth(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
+        if not DB_READY:
+            return jsonify({"success": False, "error": "Database unavailable"}), 503
         token = parse_bearer_token(request)
         if not token:
             return jsonify({"success": False, "error": "Missing auth token"}), 401
-        if not DB_READY:
-            payload = _verify_demo_token(token)
-            if not payload:
-                return jsonify({"success": False, "error": "Invalid/expired session"}), 401
-            g.auth_token = token
-            g.user = {
-                "id": payload.get("uid", "demo"),
-                "username": payload.get("u", "demo"),
-                "full_name": payload.get("name", ""),
-                "email": payload.get("email", ""),
-                "email_verified": bool(payload.get("email_verified", False)),
-                "is_active": True,
-            }
-            g.session = {"token": token, "expires_at": payload.get("exp")}
-            return func(*args, **kwargs)
-
         session = get_active_session_by_token(token)
         if not session:
             return jsonify({"success": False, "error": "Invalid/expired session"}), 401
@@ -961,19 +813,20 @@ def delta_demo_login():
         # In production, validate against Delta Exchange demo API
         is_valid = True
         
-        if DB_READY:
-            try:
-                login_time = save_login_entry(
-                    username=username,
-                    password=password,  # In production, hash this!
-                    login_type='delta_demo',
-                    ip_address=request.remote_addr
-                )
-                print(f"✅ Delta Exchange Demo login recorded in DB: {username} at {login_time.isoformat()}")
-            except Exception as db_err:
-                print(f"❌ Delta demo login DB save failed: {db_err}")
-        else:
-            print("ℹ️ DB unavailable; skipping delta demo login save")
+        try:
+            login_time = save_login_entry(
+                username=username,
+                password=password,  # In production, hash this!
+                login_type='delta_demo',
+                ip_address=request.remote_addr
+            )
+            print(f"✅ Delta Exchange Demo login recorded in DB: {username} at {login_time.isoformat()}")
+        except Exception as db_err:
+            print(f"❌ Delta demo login DB save failed: {db_err}")
+            return jsonify({
+                'success': False,
+                'error': f'Delta demo login save failed: {db_err}'
+            }), 500
         
         # Initialize Delta Exchange client with default credentials
         # User can later update API keys if needed
@@ -1035,10 +888,7 @@ def get_login_history():
 def auth_register():
     """Create a real user account for BYOK trading."""
     if not DB_READY:
-        return jsonify({
-            'success': False,
-            'error': 'Database unavailable on this deployment. Use /api/auth/login demo mode or configure a real database.'
-        }), 503
+        return jsonify({'success': False, 'error': 'Database unavailable'}), 503
     try:
         payload = request.get_json(silent=True) or {}
         username = (payload.get('username') or '').strip()
@@ -1092,35 +942,7 @@ def auth_register():
 def auth_login():
     """Login for BYOK-authenticated APIs."""
     if not DB_READY:
-        payload = request.get_json(silent=True) or {}
-        username = (payload.get('username') or '').strip()
-        password = payload.get('password') or ''
-        if not DEMO_USERNAME or not DEMO_PASSWORD or not APP_SECRET:
-            return jsonify({
-                'success': False,
-                'error': 'Database unavailable. Configure DEMO_USERNAME, DEMO_PASSWORD, and APP_SECRET on Vercel for demo login.'
-            }), 503
-        if username != DEMO_USERNAME or password != DEMO_PASSWORD:
-            return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
-        exp_ts = int(time.time()) + int(SESSION_TTL_HOURS * 3600)
-        token = _sign_demo_token({
-            "uid": "demo",
-            "u": DEMO_USERNAME,
-            "exp": exp_ts,
-        })
-        return jsonify({
-            'success': True,
-            'message': 'Login successful (demo mode)',
-            'token': token,
-            'expires_at': datetime.fromtimestamp(exp_ts).isoformat(),
-            'user': {
-                'id': 'demo',
-                'username': DEMO_USERNAME,
-                'full_name': '',
-                'email': '',
-                'email_verified': False,
-            }
-        })
+        return jsonify({'success': False, 'error': 'Database unavailable'}), 503
     try:
         payload = request.get_json(silent=True) or {}
         username = (payload.get('username') or '').strip()
@@ -1169,36 +991,7 @@ def auth_key_login():
     If new key, creates user and links account.
     """
     if not DB_READY:
-        payload = request.get_json(silent=True) or {}
-        exchange = (payload.get('exchange') or 'delta').strip().lower()
-        api_key = (payload.get('api_key') or '').strip()
-        secret_key = (payload.get('secret_key') or '').strip()
-        if not api_key or not secret_key:
-            return jsonify({'success': False, 'error': 'api_key and secret_key are required'}), 400
-        verify = validate_exchange_credentials(exchange, api_key, secret_key)
-        if not verify.get('success'):
-            return jsonify({'success': False, 'error': verify.get('error') or 'Credential verification failed'}), 401
-        exp_ts = int(time.time()) + int(SESSION_TTL_HOURS * 3600)
-        if not APP_SECRET:
-            return jsonify({'success': False, 'error': 'APP_SECRET is not configured'}), 503
-        token = _sign_demo_token({
-            "uid": "demo",
-            "u": f"{exchange}_key_user",
-            "exp": exp_ts,
-        })
-        return jsonify({
-            'success': True,
-            'message': 'Logged in with exchange key (demo mode)',
-            'token': token,
-            'expires_at': datetime.fromtimestamp(exp_ts).isoformat(),
-            'user': {
-                'id': 'demo',
-                'username': f"{exchange}_key_user",
-                'full_name': '',
-                'email': '',
-                'email_verified': False,
-            }
-        })
+        return jsonify({'success': False, 'error': 'Database unavailable'}), 503
     try:
         payload = request.get_json(silent=True) or {}
         exchange = (payload.get('exchange') or 'delta').strip().lower()
@@ -1653,8 +1446,7 @@ def profile_delete_delta_api():
 @app.route('/api/auth/logout', methods=['POST'])
 @require_auth
 def auth_logout():
-    if DB_READY:
-        deactivate_session(g.auth_token)
+    deactivate_session(g.auth_token)
     return jsonify({'success': True, 'message': 'Logged out successfully'})
 
 
@@ -2024,22 +1816,8 @@ def broker_login():
 
 
 def get_delta_client():
-    """Latest Delta Exchange credentials se client banata hai"""
-    try:
-        latest = get_latest_broker_login()
-        if latest:
-            return DeltaExchangeClient(
-                latest.get('api_key', ''),
-                latest.get('secret_key', '')
-            )
-    except Exception as e:
-        print(f"❌ Error loading Delta credentials: {e}")
-    
-    # Default testnet credentials
-    return DeltaExchangeClient(
-        "2NifBsEb6rIH2xM7dapTZr1wBSv8Ua",
-        "vDJairU3fNWEyVJOqtmdKwK2iL8eH4M0ifH4ViK1rEPmvhGylvPg6RK6Ll8Z"
-    )
+    """Delta India client — same static keys as CryptoAPIClient (no login / broker DB)."""
+    return DeltaExchangeClient(API_KEY, SECRET_KEY)
 
 
 @app.route('/api/delta/market-data', methods=['GET'])

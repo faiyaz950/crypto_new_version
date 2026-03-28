@@ -11,7 +11,6 @@ import time
 import json
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
-import os
 import pandas as pd
 
 try:
@@ -21,9 +20,8 @@ except ImportError:
     HAS_WEBSOCKET = False
 
 # API credentials (Delta Exchange India)
-# NOTE: Do not hardcode secrets in source control. Use environment variables.
-API_KEY = (os.getenv("DELTA_API_KEY") or os.getenv("API_KEY") or "").strip()
-SECRET_KEY = (os.getenv("DELTA_SECRET_KEY") or os.getenv("SECRET_KEY") or "").strip()
+API_KEY = "XBLVtcV7p6j3Qd6oSmDaQeeJsWFuHe"
+SECRET_KEY = "BjmaIGgWVBPjwc8o27Gsgxg7c3VWHZnqxtc5ZMCR0QRDMEd9eUS7GcEqgivg"
 
 # Delta Exchange India base URL
 BASE_URL = "https://api.india.delta.exchange"

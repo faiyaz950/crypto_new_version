@@ -7,19 +7,37 @@
 pip3 install flask flask-cors pandas numpy requests
 ```
 
-### 2. MySQL + Django ORM setup
+### 2. Database (Django ORM) — default SQLite
 
-Create MySQL database credentials as environment variables before starting backend:
+**Local dev ke liye kuch set karne ki zaroorat nahi:** backend start par `crypto_trading.sqlite3` project root me ban jata hai aur tables migrate ho jati hain.
+
+Optional:
 
 ```bash
+# Custom SQLite file path
+export SQLITE_PATH=/absolute/path/to/my_crypto.db
+```
+
+**MySQL (optional):** agar aap MySQL use karna chahein:
+
+```bash
+export USE_MYSQL=true
 export MYSQL_HOST=127.0.0.1
 export MYSQL_PORT=3306
 export MYSQL_USER=root
 export MYSQL_PASSWORD=your_mysql_password
 export MYSQL_DATABASE=crypto_trading
-export BYOK_ENCRYPTION_KEY=replace_with_fernet_or_passphrase
+```
 
-# SMTP (OTP email delivery)
+**BYOK / encryption (recommended for any environment):**
+
+```bash
+export BYOK_ENCRYPTION_KEY=replace_with_fernet_or_passphrase
+```
+
+**SMTP (OTP email delivery):**
+
+```bash
 export SMTP_HOST=smtp.gmail.com
 export SMTP_PORT=587
 export SMTP_USERNAME=you@example.com
@@ -29,10 +47,10 @@ export SMTP_USE_TLS=true
 export EMAIL_OTP_DEBUG=false
 ```
 
-Backend startup par Django ORM required tables automatically create karega:
-- `app_logins`
-- `broker_logins`
-- `demo_orders`
+Backend startup par Django ORM migrate karta hai; tables include (among others):
+
+- `app_logins`, `broker_logins`, `demo_orders`
+- `user_accounts`, `user_sessions`, `exchange_accounts`, `byok_orders`, `email_change_otps`
 
 ### 3. Start Server
 ```bash

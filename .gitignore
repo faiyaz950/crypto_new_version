@@ -1,6 +1,8 @@
 # Login data & secrets (sensitive)
 login_data.json
 broker_login_data.json
+crypto_trading.sqlite3
+*.sqlite3
 .env
 .env.local
 *.pem
@@ -23,10 +25,3 @@ env/
 # OS
 .DS_Store
 Thumbs.db
-
-# Local runtime artifacts
-crypto_trading.sqlite3
-server.log
-static/*.bak
-
-.env
