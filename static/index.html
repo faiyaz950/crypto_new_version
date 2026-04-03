@@ -1703,20 +1703,26 @@
                                     <label>Order Quantity</label>
                                     <input type="number" id="customStrategyQty" value="0.001" step="0.001" min="0.001" placeholder="0.001">
                                 </div>
-                                <div class="param-item">
-                                    <label>Stop Loss (Points)</label>
-                                    <input type="number" id="customStrategySL" value="400" min="1" step="1" placeholder="400">
-                                </div>
-                                <div class="param-item">
-                                    <label>Target (Points)</label>
-                                    <input type="number" id="customStrategyTarget" value="800" min="1" step="1" placeholder="800">
-                                </div>
-                                <div class="param-item">
-                                    <label style="display: flex; align-items: center; gap: 8px;">
-                                        <input type="checkbox" id="customStrategySlTpAuto" style="width: auto; margin: 0;" checked>
-                                        Live: SL / Target par position auto close
-                                    </label>
-                                    <span style="font-size: 11px; color: #6b7280; display: block; margin-top: 4px;">Points = entry se kitna move par exit (SL loss side, target profit side).</span>
+                                <div style="flex: 1 1 100%; width: 100%; margin-top: 4px; padding: 14px 14px 12px; background: linear-gradient(135deg, #f8fafc 0%, #fff 100%); border-radius: 12px; border: 1px solid #e2e8f0;">
+                                    <div style="font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 6px;">📝 Apni SL / Target (points)</div>
+                                    <p style="font-size: 12px; color: #64748b; margin: 0 0 12px; line-height: 1.45;">Neeche <strong>khud values type</strong> karo (default sirf example). Live trade ke baad entry se itne <strong>points</strong> move par exit — jaise SL <code style="font-size: 11px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">500</code>, Target <code style="font-size: 11px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">2000</code>.</p>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end;">
+                                        <div class="param-item" style="margin: 0;">
+                                            <label for="customStrategySL">Stop Loss — points (aap likho)</label>
+                                            <input type="number" id="customStrategySL" name="customStrategySL" value="400" min="0.01" step="any" inputmode="decimal" placeholder="e.g. 500" title="Loss side: entry se kitne points neeche/upar par SL">
+                                        </div>
+                                        <div class="param-item" style="margin: 0;">
+                                            <label for="customStrategyTarget">Target — points (aap likho)</label>
+                                            <input type="number" id="customStrategyTarget" name="customStrategyTarget" value="800" min="0.01" step="any" inputmode="decimal" placeholder="e.g. 2000" title="Profit side: entry se kitne points par target">
+                                        </div>
+                                        <div class="param-item" style="margin: 0;">
+                                            <label style="display: flex; align-items: center; gap: 8px;">
+                                                <input type="checkbox" id="customStrategySlTpAuto" style="width: auto; margin: 0;" checked>
+                                                Live par auto close (SL / Target)
+                                            </label>
+                                            <span style="font-size: 11px; color: #64748b; display: block; margin-top: 6px;">On = mark price se points check karke position band.</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="param-item">
                                     <label>Auto Trade (Delta Exchange)</label>
@@ -2078,8 +2084,8 @@
             strategySlTpWatch = {
                 active: true,
                 symbol: symbol,
-                slPoints: Math.max(1, Number(slPoints) || 400),
-                targetPoints: Math.max(1, Number(targetPoints) || 800),
+                slPoints: Math.max(0.01, Number(slPoints) || 400),
+                targetPoints: Math.max(0.01, Number(targetPoints) || 800),
                 closing: false
             };
             addToStrategyLog(`🛡️ SL/Target watch ON: ${strategySlTpWatch.slPoints} / ${strategySlTpWatch.targetPoints} points (mark price check ~10s)`);
