@@ -1675,7 +1675,7 @@
 
                         <div class="strategy-card" style="border: 2px solid #667eea; background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);">
                             <h3>🎯 Custom EMA Crossover Strategy</h3>
-                            <p><strong>Logic:</strong> Jab EMA 9 aur EMA 21 dono EMA 50 ko cross down karein to SELL, aur jab cross above ho to BUY. <strong>Timeframe: 5 minutes</strong>. SL: 400 points, Target: 800 points.</p>
+                            <p><strong>Logic:</strong> Jab EMA 9 aur EMA 21 dono EMA 50 ko cross down karein to SELL, aur jab cross above ho to BUY. <strong>Timeframe: 5 minutes</strong>. Neeche <strong>SL / Target (points)</strong> daal sakte ho — Live trade par mark price se position auto cut hogi (jaise SL 500, Target 2000).</p>
                             <div class="strategy-params">
                                 <div class="param-item">
                                     <label>EMA 9</label>
@@ -1710,6 +1710,13 @@
                                 <div class="param-item">
                                     <label>Target (Points)</label>
                                     <input type="number" id="customStrategyTarget" value="800" min="1" step="1" placeholder="800">
+                                </div>
+                                <div class="param-item">
+                                    <label style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="checkbox" id="customStrategySlTpAuto" style="width: auto; margin: 0;" checked>
+                                        Live: SL / Target par position auto close
+                                    </label>
+                                    <span style="font-size: 11px; color: #6b7280; display: block; margin-top: 4px;">Points = entry se kitna move par exit (SL loss side, target profit side).</span>
                                 </div>
                                 <div class="param-item">
                                     <label>Auto Trade (Delta Exchange)</label>
@@ -2031,6 +2038,149 @@
             emaData: [],
             intervalId: null
         };
+
+        /** Live Delta: SL/Target in points — poll mark vs entry and reduce_only close */
+        let strategySlTpWatch = {
+            active: false,
+            symbol: null,
+            slPoints: 400,
+            targetPoints: 800,
+            closing: false
+        };
+        let slTpMonitorIntervalId = null;
+
+        function parseDeltaPositionsPayload(data) {
+            if (!data || !data.success) return [];
+            return Array.isArray(data.data)
+                ? data.data
+                : (Array.isArray(data.data?.result) ? data.data.result : []);
+        }
+
+        function normalizeSymKey(s) {
+            return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
+
+        function deltaPositionMatchesSymbol(pos, strategySymbol) {
+            const ps = pos.symbol || pos.product_symbol || pos.underlying_asset_symbol || pos.product_id || '';
+            const a = normalizeSymKey(ps);
+            const b = normalizeSymKey(strategySymbol);
+            if (!a || !b) return false;
+            return a === b || a.includes(b) || b.includes(a);
+        }
+
+        function registerStrategySlTpWatch(symbol, slPoints, targetPoints) {
+            const auto = document.getElementById('customStrategySlTpAuto');
+            if (!auto || !auto.checked) return;
+            if (slTpMonitorIntervalId) {
+                clearInterval(slTpMonitorIntervalId);
+                slTpMonitorIntervalId = null;
+            }
+            strategySlTpWatch = {
+                active: true,
+                symbol: symbol,
+                slPoints: Math.max(1, Number(slPoints) || 400),
+                targetPoints: Math.max(1, Number(targetPoints) || 800),
+                closing: false
+            };
+            addToStrategyLog(`🛡️ SL/Target watch ON: ${strategySlTpWatch.slPoints} / ${strategySlTpWatch.targetPoints} points (mark price check ~10s)`);
+            startSlTpMonitor();
+            setTimeout(function() { pollSlTpExit(); }, 2500);
+        }
+
+        function clearStrategySlTpWatch(reason) {
+            strategySlTpWatch.active = false;
+            strategySlTpWatch.symbol = null;
+            strategySlTpWatch.closing = false;
+            if (reason) addToStrategyLog(reason);
+            if (slTpMonitorIntervalId) {
+                clearInterval(slTpMonitorIntervalId);
+                slTpMonitorIntervalId = null;
+            }
+        }
+
+        function startSlTpMonitor() {
+            if (slTpMonitorIntervalId) return;
+            slTpMonitorIntervalId = setInterval(function() {
+                pollSlTpExit();
+            }, 10000);
+        }
+
+        async function closeDeltaPositionReduceOnly(symbol, closeSide, quantity) {
+            const response = await fetch('/api/delta/place-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    symbol: symbol,
+                    side: closeSide,
+                    order_type: 'market',
+                    quantity: quantity,
+                    reduce_only: true
+                })
+            });
+            return response.json();
+        }
+
+        async function pollSlTpExit() {
+            if (!strategySlTpWatch.active || strategySlTpWatch.closing) return;
+            const sym = strategySlTpWatch.symbol;
+            if (!sym) return;
+
+            try {
+                const res = await fetch('/api/delta/positions');
+                const data = await res.json();
+                const positions = parseDeltaPositionsPayload(data);
+                const pos = positions.find(function(p) { return deltaPositionMatchesSymbol(p, sym); });
+
+                const rawSize = pos ? parseFloat(pos.size) : 0;
+                const sizeAbs = Math.abs(rawSize);
+                if (!pos || !Number.isFinite(sizeAbs) || sizeAbs < 1e-12) {
+                    clearStrategySlTpWatch('📍 Position band / flat — SL/Target watch hata diya.');
+                    loadPositions();
+                    return;
+                }
+
+                const entry = parseFloat(pos.entry_price);
+                const mark = parseFloat(pos.mark_price != null ? pos.mark_price : (pos.last_price != null ? pos.last_price : entry));
+                if (!Number.isFinite(entry) || !Number.isFinite(mark)) return;
+
+                const slP = strategySlTpWatch.slPoints;
+                const tpP = strategySlTpWatch.targetPoints;
+                const isLong = rawSize > 0;
+
+                let slPrice, targetPrice, hit = null;
+                if (isLong) {
+                    slPrice = entry - slP;
+                    targetPrice = entry + tpP;
+                    if (mark <= slPrice) hit = 'SL_HIT';
+                    else if (mark >= targetPrice) hit = 'TARGET_HIT';
+                } else {
+                    slPrice = entry + slP;
+                    targetPrice = entry - tpP;
+                    if (mark >= slPrice) hit = 'SL_HIT';
+                    else if (mark <= targetPrice) hit = 'TARGET_HIT';
+                }
+
+                if (!hit) return;
+
+                strategySlTpWatch.closing = true;
+                const closeSide = isLong ? 'sell' : 'buy';
+                addToStrategyLog(`⚡ ${hit === 'SL_HIT' ? 'Stop Loss' : 'Target'} — closing ${sym} @ mark ~${mark.toFixed(2)} (entry ${entry.toFixed(2)})`);
+
+                const closeData = await closeDeltaPositionReduceOnly(sym, closeSide, sizeAbs);
+                if (closeData.success) {
+                    addToStrategyLog(`✅ Position closed (${hit === 'SL_HIT' ? 'SL' : 'Target'}) — reduce_only market`);
+                    clearStrategySlTpWatch(null);
+                    loadPositions();
+                    loadOrders();
+                } else {
+                    addToStrategyLog(`❌ Auto close failed: ${closeData.error || 'Unknown'}`);
+                    strategySlTpWatch.closing = false;
+                }
+            } catch (e) {
+                console.error('pollSlTpExit', e);
+                strategySlTpWatch.closing = false;
+            }
+        }
 
         function isInNoEntryWindowIST(date = new Date()) {
             const parts = new Intl.DateTimeFormat('en-GB', {
@@ -2886,9 +3036,7 @@
                     addToStrategyLog(`📋 Order ID: ${data.data?.id || data.data?.order_id || 'N/A'}`);
                     addToStrategyLog(`🛡️ Stop Loss: ${slPrice.toFixed(2)} (${slPoints} points)`);
                     addToStrategyLog(`🎯 Target: ${targetPrice.toFixed(2)} (${targetPoints} points)`);
-                    
-                    // Place SL and Target orders (if supported)
-                    // Note: Delta Exchange might need separate API calls for SL/Target
+                    registerStrategySlTpWatch(symbol, slPoints, targetPoints);
                     
                     showStrategySignal(symbol, side.toUpperCase(), `Live order placed: ${quantity} @ Market`);
                     updateActivity(side, symbol, quantity, null);
