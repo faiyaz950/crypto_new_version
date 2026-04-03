@@ -1704,19 +1704,19 @@
                                     <input type="number" id="customStrategyQty" value="0.001" step="0.001" min="0.001" placeholder="0.001">
                                 </div>
                                 <div class="param-item">
-                                    <label>Your SL (points)</label>
-                                    <input type="number" id="customStrategySL" value="" min="1" step="1" placeholder="e.g. 500" title="Aap yahan stop loss points likhen">
+                                    <label>Stop Loss (Points)</label>
+                                    <input type="number" id="customStrategySL" value="400" min="1" step="1" placeholder="400">
                                 </div>
                                 <div class="param-item">
-                                    <label>Your target (points)</label>
-                                    <input type="number" id="customStrategyTarget" value="" min="1" step="1" placeholder="e.g. 2000" title="Aap yahan target points likhen">
+                                    <label>Target (Points)</label>
+                                    <input type="number" id="customStrategyTarget" value="800" min="1" step="1" placeholder="800">
                                 </div>
                                 <div class="param-item">
                                     <label style="display: flex; align-items: center; gap: 8px;">
                                         <input type="checkbox" id="customStrategySlTpAuto" style="width: auto; margin: 0;" checked>
                                         Live: SL / Target par position auto close
                                     </label>
-                                    <span style="font-size: 11px; color: #6b7280; display: block; margin-top: 4px;">Upar <strong>Your SL / Your target</strong> fields mein points khud likhen. Points = entry se kitna move par exit.</span>
+                                    <span style="font-size: 11px; color: #6b7280; display: block; margin-top: 4px;">Points = entry se kitna move par exit (SL loss side, target profit side).</span>
                                 </div>
                                 <div class="param-item">
                                     <label>Auto Trade (Delta Exchange)</label>
@@ -1924,12 +1924,12 @@
                                 </div>
                                 <div id="backtestPageFixedRiskFields" style="display: contents;">
                                     <div class="param-item">
-                                        <label>Your SL (points)</label>
-                                        <input type="number" id="backtestPageSL" value="" min="1" step="1" placeholder="e.g. 500" title="EMA strategy: SL points yahan enter karein">
+                                        <label>SL (Points)</label>
+                                        <input type="number" id="backtestPageSL" value="400" min="1" step="1">
                                     </div>
                                     <div class="param-item">
-                                        <label>Your target (points)</label>
-                                        <input type="number" id="backtestPageTarget" value="" min="1" step="1" placeholder="e.g. 2000" title="EMA strategy: target points yahan enter karein">
+                                        <label>Target (Points)</label>
+                                        <input type="number" id="backtestPageTarget" value="800" min="1" step="1">
                                     </div>
                                 </div>
                                 <div class="param-item">
@@ -1950,13 +1950,9 @@
                                         <label>Range End</label>
                                         <input type="time" id="backtestPageRangeEnd" value="13:00" step="60">
                                     </div>
-                                    <div class="param-item">
-                                        <label>Target Multiplier</label>
-                                        <input type="number" id="backtestPageRiskReward" value="2" min="0.1" step="0.1" title="Target = (SL distance) × Multiplier">
-                                    </div>
                                 </div>
                                 <p style="font-size: 11px; color: #6b7280; margin-top: 8px; line-height: 1.4;">
-                                    💡 <strong>Logic:</strong> Range ke upar/neeche candle close ke baad, breakout candle ke high/low break par entry hoti hai, aur <strong>RSI filter mandatory</strong> hai.
+                                    💡 <strong>Logic:</strong> Range ke upar/neeche candle close ke baad, breakout candle ke high/low break par entry hoti hai, <strong>RSI filter mandatory</strong>. <strong>SL / Target (points)</strong> upar wale fields se — entry price se fixed points par exit.
                                 </p>
                             </div>
                             
@@ -2078,8 +2074,8 @@
             strategySlTpWatch = {
                 active: true,
                 symbol: symbol,
-                slPoints: Math.max(1, Number(slPoints)),
-                targetPoints: Math.max(1, Number(targetPoints)),
+                slPoints: Math.max(1, Number(slPoints) || 400),
+                targetPoints: Math.max(1, Number(targetPoints) || 800),
                 closing: false
             };
             addToStrategyLog(`🛡️ SL/Target watch ON: ${strategySlTpWatch.slPoints} / ${strategySlTpWatch.targetPoints} points (mark price check ~10s)`);
@@ -2180,21 +2176,6 @@
                 console.error('pollSlTpExit', e);
                 strategySlTpWatch.closing = false;
             }
-        }
-
-        /** SL / Target points — user must enter positive numbers (no hidden defaults). */
-        function readUserSlTargetPoints(slInputId, targetInputId) {
-            const slRaw = parseFloat(document.getElementById(slInputId)?.value);
-            const tpRaw = parseFloat(document.getElementById(targetInputId)?.value);
-            if (!Number.isFinite(slRaw) || slRaw <= 0) {
-                alert('Pehle Stop Loss (points) enter karein — koi positive number (jaise 500).');
-                return null;
-            }
-            if (!Number.isFinite(tpRaw) || tpRaw <= 0) {
-                alert('Pehle Target (points) enter karein — koi positive number (jaise 2000).');
-                return null;
-            }
-            return { slPoints: slRaw, targetPoints: tpRaw };
         }
 
         function isInNoEntryWindowIST(date = new Date()) {
@@ -3007,10 +2988,8 @@
 
         async function executeStrategyOrder(symbol, side, signal) {
             const quantity = parseFloat(document.getElementById('customStrategyQty').value) || 0.001;
-            const pts = readUserSlTargetPoints('customStrategySL', 'customStrategyTarget');
-            if (!pts) return;
-            const slPoints = pts.slPoints;
-            const targetPoints = pts.targetPoints;
+            const slPoints = parseFloat(document.getElementById('customStrategySL').value) || 400;
+            const targetPoints = parseFloat(document.getElementById('customStrategyTarget').value) || 800;
             
             // Get current price for SL/Target calculation
             try {
@@ -3452,14 +3431,8 @@ ${workbookSheets}
         async function runBacktestFromPage() {
             const strategy = (document.getElementById('backtestPageStrategy')?.value || 'ema-crossover').toLowerCase();
             const symbol = document.getElementById('backtestPageSymbol').value;
-            let slPoints = 0;
-            let targetPoints = 0;
-            if (strategy === 'ema-crossover') {
-                const pts = readUserSlTargetPoints('backtestPageSL', 'backtestPageTarget');
-                if (!pts) return;
-                slPoints = pts.slPoints;
-                targetPoints = pts.targetPoints;
-            }
+            const slPoints = parseFloat(document.getElementById('backtestPageSL').value) || 400;
+            const targetPoints = parseFloat(document.getElementById('backtestPageTarget').value) || 800;
             const ema9 = parseInt(document.getElementById('backtestPageEma9').value) || 9;
             const ema21 = parseInt(document.getElementById('backtestPageEma21').value) || 21;
             const ema50 = parseInt(document.getElementById('backtestPageEma50').value) || 50;
@@ -3475,7 +3448,6 @@ ${workbookSheets}
             const useNoEntryWindow = document.getElementById('backtestPageNoEntryWindow')?.checked ?? true;
             const rangeStart = document.getElementById('backtestPageRangeStart')?.value || '11:00';
             const rangeEnd = document.getElementById('backtestPageRangeEnd')?.value || '13:00';
-            const riskReward = parseFloat(document.getElementById('backtestPageRiskReward')?.value) || 2;
             const periodLabel = days + ' Days';
             const resultsDiv = document.getElementById('backtestPageResults');
             const statsDiv = document.getElementById('backtestPageStats');
@@ -3498,9 +3470,10 @@ ${workbookSheets}
                     }
                     apiUrl += '&use_no_entry_window=' + useNoEntryWindow;
                 } else {
-                    // Range Breakout: RSI mandatory + range window
+                    // Range Breakout: RSI mandatory + range window + user SL/Target (points from entry)
+                    apiUrl += '&sl_points=' + slPoints + '&target_points=' + targetPoints;
                     apiUrl += '&use_rsi_filter=true&rsi_period=' + rsiPeriod + '&rsi_overbought=' + rsiOverbought + '&rsi_oversold=' + rsiOversold;
-                    apiUrl += '&range_timezone=Asia%2FKolkata&range_start=' + encodeURIComponent(rangeStart) + '&range_end=' + encodeURIComponent(rangeEnd) + '&risk_reward=' + encodeURIComponent(String(riskReward));
+                    apiUrl += '&range_timezone=Asia%2FKolkata&range_start=' + encodeURIComponent(rangeStart) + '&range_end=' + encodeURIComponent(rangeEnd);
                     apiUrl += '&use_no_entry_window=false';
                 }
                 
@@ -3516,7 +3489,7 @@ ${workbookSheets}
                     const strategyLabel = data.strategy ? (data.strategy === 'range-breakout' ? 'Range Breakout' : 'EMA Crossover') : '';
                     const emaInfo = data.ema_periods ? 'EMA(' + data.ema_periods.ema9 + ',' + data.ema_periods.ema21 + ',' + data.ema_periods.ema50 + ')' : '';
                     const rsiInfo = data.rsi_settings && data.rsi_settings.enabled ? 'RSI(' + data.rsi_settings.period + ',' + data.rsi_settings.overbought + ',' + data.rsi_settings.oversold + ')' : '';
-                    const rangeInfo = data.range_settings ? ('Range ' + (data.range_settings.start || '') + '→' + (data.range_settings.end || '') + ' IST · 1:' + (data.range_settings.risk_reward || 2)) : '';
+                    const rangeInfo = data.range_settings ? ('Range ' + (data.range_settings.start || '') + '→' + (data.range_settings.end || '') + ' IST · SL ' + (data.range_settings.sl_points != null ? data.range_settings.sl_points : slPoints) + ' / Tgt ' + (data.range_settings.target_points != null ? data.range_settings.target_points : targetPoints) + ' pts') : '';
                     const lotsLabel = (data.lots && data.lots !== 1) ? ' (' + data.lots + ' lots)' : '';
                     var daysSub = (data.days_requested != null && data.days_covered != null && data.days_covered < data.days_requested) ? ('of ' + data.days_requested + ' requested · ' + (data.total_candles || 0) + ' candles') : ((data.total_candles || 0) + ' candles');
                     var daysLimitedNote = (data.days_requested != null && data.days_covered != null && data.days_covered < data.days_requested) ? '<div style="font-size: 10px; color: #b45309; margin-top: 4px;">Exchange limited history for this timeframe</div>' : '';
@@ -3547,7 +3520,6 @@ ${workbookSheets}
                         rsiOversold: data.rsi_settings?.oversold ?? rsiOversold,
                         rangeStart: data.range_settings?.start ?? rangeStart,
                         rangeEnd: data.range_settings?.end ?? rangeEnd,
-                        riskReward: data.range_settings?.risk_reward ?? riskReward,
                         noEntryWindow: !!data.use_no_entry_window,
                         lots: data.lots || lots,
                         slPoints: data.sl_points || slPoints,
@@ -3587,7 +3559,7 @@ ${workbookSheets}
             const noEntryEl = document.getElementById('backtestPageNoEntryWindow');
             if (strategy === 'range-breakout') {
                 if (emaFields) emaFields.style.display = 'none';
-                if (fixedRiskFields) fixedRiskFields.style.display = 'none';
+                if (fixedRiskFields) fixedRiskFields.style.display = 'contents';
                 if (rangeSection) rangeSection.style.display = 'block';
                 if (rsiTitle) rsiTitle.textContent = '📈 RSI Settings (Required for Range Breakout)';
                 if (rsiHint) rsiHint.innerHTML = '💡 <strong>Rule:</strong> BUY only when RSI &gt; Upper, SELL only when RSI &lt; Lower (entry breakout candle high/low break par).';
@@ -3606,10 +3578,8 @@ ${workbookSheets}
 
         async function runBacktest() {
             const symbol = document.getElementById('customStrategySymbol').value;
-            const pts = readUserSlTargetPoints('customStrategySL', 'customStrategyTarget');
-            if (!pts) return;
-            const slPoints = pts.slPoints;
-            const targetPoints = pts.targetPoints;
+            const slPoints = parseFloat(document.getElementById('customStrategySL').value) || 400;
+            const targetPoints = parseFloat(document.getElementById('customStrategyTarget').value) || 800;
             const lots = Math.max(0.01, parseFloat(document.getElementById('backtestLots').value) || 1);
             const ema9 = parseInt(document.getElementById('customEma9').value) || 9;
             const ema21 = parseInt(document.getElementById('customEma21').value) || 21;

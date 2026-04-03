@@ -2080,7 +2080,6 @@ def backtest_strategy():
         range_start = (request.args.get('range_start') or '11:00').strip()
         range_end = (request.args.get('range_end') or '13:00').strip()
         range_timezone = (request.args.get('range_timezone') or 'Asia/Kolkata').strip()
-        risk_reward = float(request.args.get('risk_reward', 2.0))
         
         # Validate inputs - support up to 700 days
         if days <= 0:
@@ -2105,7 +2104,7 @@ def backtest_strategy():
         elif strategy_name in {"range-breakout", "range_breakout", "range breakout"}:
             print(f"   Range window ({range_timezone}): {range_start} → {range_end}")
             print(f"   RSI: Period={rsi_period}, Upper={rsi_overbought}, Lower={rsi_oversold}")
-            print(f"   Risk:Reward = 1:{risk_reward:g} (Target = {risk_reward:g}x SL)")
+            print(f"   SL / Target (points from entry): {sl_points} / {target_points}")
         else:
             return jsonify({
                 'success': False,
@@ -2378,8 +2377,11 @@ def backtest_strategy():
                     'success': False,
                     'error': 'range_start must be earlier than range_end (same day, IST).'
                 }), 400
-            if risk_reward <= 0:
-                return jsonify({'success': False, 'error': 'risk_reward must be > 0'}), 400
+            if sl_points <= 0 or target_points <= 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'sl_points and target_points must be greater than 0 (range breakout).'
+                }), 400
 
             current_day = None
             range_high = None
@@ -2454,16 +2456,12 @@ def backtest_strategy():
                 if breakout_long and not position:
                     if (not traded_long) and (current['time'] > breakout_long['time']) and current['high'] > breakout_long['high'] and float(current_rsi) > rsi_overbought:
                         entry_price = float(breakout_long['high'])
-                        sl_price = float(breakout_long['low'])
-                        risk = entry_price - sl_price
-                        if risk <= 0:
-                            continue
                         position = {
                             'side': 'buy',
                             'entry_price': entry_price,
                             'entry_time': current['time'],
-                            'sl': sl_price,
-                            'target': entry_price + (risk_reward * risk)
+                            'sl': entry_price - sl_points,
+                            'target': entry_price + target_points
                         }
                         total_trades += 1
                         traded_long = True
@@ -2472,16 +2470,12 @@ def backtest_strategy():
                 if breakout_short and not position:
                     if (not traded_short) and (current['time'] > breakout_short['time']) and current['low'] < breakout_short['low'] and float(current_rsi) < rsi_oversold:
                         entry_price = float(breakout_short['low'])
-                        sl_price = float(breakout_short['high'])
-                        risk = sl_price - entry_price
-                        if risk <= 0:
-                            continue
                         position = {
                             'side': 'sell',
                             'entry_price': entry_price,
                             'entry_time': current['time'],
-                            'sl': sl_price,
-                            'target': entry_price - (risk_reward * risk)
+                            'sl': entry_price + sl_points,
+                            'target': entry_price - target_points
                         }
                         total_trades += 1
                         traded_short = True
@@ -2536,7 +2530,8 @@ def backtest_strategy():
                 'timezone': range_timezone,
                 'start': range_start,
                 'end': range_end,
-                'risk_reward': risk_reward,
+                'sl_points': sl_points,
+                'target_points': target_points,
             } if strategy_name != 'ema-crossover' else None,
             'total_trades': len(trades),  # Completed trades only
             'total_signals': total_trades,  # All entry signals (including open positions)
@@ -2547,8 +2542,8 @@ def backtest_strategy():
             'win_rate': round(win_rate, 2),
             'total_profit': round(total_profit, 2),
             'lots': lots,
-            'sl_points': sl_points if strategy_name == 'ema-crossover' else None,
-            'target_points': target_points if strategy_name == 'ema-crossover' else None,
+            'sl_points': sl_points,
+            'target_points': target_points,
             'use_no_entry_window': use_no_entry_window,
             'trades': trades  # Return full trade list for complete reporting/export
         })
